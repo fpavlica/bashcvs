@@ -32,7 +32,22 @@ function delRepo()
 		let counter+=1
 		if [ $counter == $number ]
 		then
-			rmdir $index
+			pass=false
+		 	while [ "$pass" = false ]
+		 	do
+
+			 	echo "Are you sure that you want to delete the repository $index and all files in it? (Y/n)"
+			 	read choice
+		 		case $choice in
+		 			Y|y) # TODO add file to repo, ask for source
+						rm -r $index
+						pass=true ;;
+					N|n) echo "not removing"
+						pass=true	;;
+					*) echo "Invalid option. Try again:"
+						pass=false ;;
+		 		esac
+		 	done
 		fi
 	done
 }
