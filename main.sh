@@ -63,8 +63,8 @@ make_statusfile() {
 		touch "$statusfile"
 		for file in $(ls)
 		do
-			echo "$file,F" >> "$statusfile"
-			# $file,E means the file is being Edited, $file,F means it's Finished until further changes are needed
+			echo "$file,IN" >> "$statusfile"
+			# $file,OUT means the file is being rdited, $file,IN means it's finished until further changes are needed
 		done
 	fi
 }
@@ -92,16 +92,15 @@ check_out () {
 		exec 3<> ./tempstatusfile
 
 
-		#sed -ie "s/$file,E/$file,F/" $statusfile #logs that the file is being edited in $statusfile
 		while read line || [ -n "$line" ]	#should prevent skipping the last line
 		do
 			#echo "$line"
-			if [ "$line" = "$file,F" ]
+			if [ "$line" = "$file,IN" ]
 			then
-				#change the line to $file,E
-				line="$file,E"
+				#change the line to $file,OUT
+				line="$file,OUT"
 
-			elif [ "$line" = "$file,E" ]
+			elif [ "$line" = "$file,OUT" ]
 			then
 				echo "This file is already being edited."
 			#else 
@@ -116,11 +115,11 @@ check_out () {
 	else 
 	 	echo "\"$file\" is not a correct file path."
 	fi
-cat "$statusfile"
+#cat "$statusfile"
 }
 
 add_to_repo () {
-	# expecting a file name as parameter $1
+	# expecting a name of the new file that should be added to the repository as parameter $1
 
 	#ask for source
 	echo "Please enter the full path of the file you would like to add"
@@ -128,7 +127,7 @@ add_to_repo () {
 	if [ -f "$fToAdd" ]
 	then
 		cp "$fToAdd" "$curr_repo" # copy the file to the current folder
-		echo "$1,F" >> $statusfile
+		echo "$1,IN" >> $statusfile
 		echo "Added $fToAdd to the current repository as $1"
 	else
 		echo "This is not a valid path to a file"
@@ -159,7 +158,7 @@ check_in () {
 		while read line || [ -n "$line" ]	#should prevent skipping the last line
 		do
 			#echo "$line"
-			if [ "$line" = "$file,E" ]
+			if [ "$line" = "$file,OUT" ]
 			then
 				seconds="$(date +%s)"
 				diff "$outdir/$file" "$curr_repo/$file" > "$diffdir/$file-$seconds.diff" #save a diff file
@@ -184,10 +183,10 @@ check_in () {
 			 	done
 			 	echo "$(date -d@$seconds): $comment" >> "$logdir/$file.log"
 
-				line="$file,F" # change the line to $file,E
+				line="$file,IN" # change the line to $file,IN
 				echo "File checked in successfully."
 
-			elif [ "$line" = "$file,F" ]
+			elif [ "$line" = "$file,IN" ]
 			then
 				echo "This file has not been checked out yet."
 			#else 
@@ -217,7 +216,7 @@ check_in () {
 	 		esac
 	 	done
 	fi
-	cat "$statusfile"
+	#cat "$statusfile"
 
 }
 
@@ -332,4 +331,3 @@ done
 
 cd ..
 exit 0
-
