@@ -1,11 +1,17 @@
 #! /bin/bash
 
+editor="subl" #default file editor
+diffdir=".diffs"
+logdir=".logs"
+
 function addRepo() 
 {
 	echo
 	echo "Enter name of repository." 
 	read name
 	mkdir $name 
+	mkdir "$name/$diffdir"
+	mkdir "$name/$logdir"
 }
 
 function delRepo() 
@@ -31,8 +37,9 @@ function delRepo()
 	done
 }
 
-statusfile=statusinfo
-curr_repo="."
+statusfile=".statusinfo"
+curr_repo="." #eh probably change this
+outdir="./out"
 
 make_statusfile() {
 
@@ -42,25 +49,28 @@ make_statusfile() {
 		for file in $(ls)
 		do
 			echo "$file,F" >> "$statusfile"
+			# $file,E means the file is being Edited, $file,F means it's Finished until further changes are needed
 		done
 	fi
 }
 
 #logging a file out
 check_out () {
+	pwd
 	
 	echo "enter name of the file to log out"
 	read file #$file is the path of the file to be checked out, passed as the first variable to the function
-	echo "enter the full path to the directory where you want to copy this file"
-	read newpath #$newpath is where the file is to be copied, passed as the second variable to the function
+	#echo "enter the full path to the directory where you want to copy this file"
+	#read newpath #$newpath is where the file is to be copied, passed as the second variable to the function
 		#TODO make sure newpath exists
 
 	#if file exists
 	if [ -f $file ]
 	then 
 		# copy it to the new path
-		cp "$file" "$newpath"
+		# cp "$file" "$newpath"
 
+		cp "$file" "$outdir" #copy the file to the editing directory
 
 		#make a temp new statusfile
 		touch tempstatusfile
@@ -94,6 +104,22 @@ check_out () {
 cat "$statusfile"
 }
 
+add_to_repo () {
+	# expecting a file name as parameter $1
+
+	#ask for source
+	echo "Please enter the full path of the file you would like to add"
+	read fToAdd
+	if [ -f "$fToAdd" ]
+	then
+		cp "$fToAdd" "$curr_repo" # copy the file to the current folder
+		echo "$1,F" >> $statusfile
+		echo "Added $fToAdd to the current repository as $1"
+	else
+		echo "This is not a valid path to a file"
+	fi
+}
+
 
 check_in () {
 	echo "enter the name of the file you want to log in / update"
@@ -101,8 +127,8 @@ check_in () {
 		#TODO make sure newpath exists
 
 	#     ask to enter full path of the newly edited file
-	echo "please enter the FULL path to the new file"
-	read fullpath
+	#echo "please enter the FULL path to the new file"
+	#read fullpath
 
 	#if file exists
 	if [ -f $file ]
@@ -120,9 +146,30 @@ check_in () {
 			#echo "$line"
 			if [ "$line" = "$file,E" ]
 			then
-				cp "$fullpath" "$curr_repo/$file"
-				#change the line to $file,E
-				line="$file,F"
+				seconds="$(date +%s)"
+				diff "$outdir/$file" "$curr_repo/$file" > "$diffdir/$file-$seconds.diff" #save a diff file
+				cp "$outdir/$file" "$curr_repo/$file" # copy the file from the work directory to the current dirrectory
+
+
+			 	pass=false
+			 	while [ "$pass" = false ]
+			 	do
+					echo "Would you like to add a short comment about this edit to the log file? (Y/n)"
+				 	read choice
+			 		case $choice in
+			 			Y|y)
+							echo "Enter your comment:"
+							read comment
+							pass=true ;;
+						N|n) 
+							pass=true	;;
+						*) echo "Invalid option. Try again:"
+							pass=false ;;
+			 		esac
+			 	done
+			 	echo "$(date -d@$seconds): $comment" >> "$logdir/$file.log"
+
+				line="$file,F" # change the line to $file,E
 				echo "File checked in successfully."
 
 			elif [ "$line" = "$file,F" ]
@@ -138,8 +185,22 @@ check_in () {
 		exec 3>&-
 		rm tempstatusfile
 	else 
-	 	echo "\"$file\" is not in the repo. adding it."
-	 	cp "$fullpath" "$curr_repo/$file"
+	 	pass=false
+	 	while [ "$pass" = false ]
+	 	do
+
+		 	echo "\"$file\" is not in the repository. Would you like to add it? (Y/n)"
+		 	read choice
+	 		case $choice in
+	 			Y|y) # TODO add file to repo, ask for source
+					add_to_repo $file
+					pass=true ;;
+				N|n) echo "not adding"
+					pass=true	;;
+				*) echo "Invalid option. Try again:"
+					pass=false ;;
+	 		esac
+	 	done
 	fi
 	cat "$statusfile"
 
@@ -150,14 +211,14 @@ function selRepo()
 	echo
 	echo "Which repository do you want to access?"
 	counter=0
-	for index in $(ls)
+	for index in $(ls -d */)
 	do
 		let counter+=1
 		echo "$counter) $index"
 	done
 	read number
 	counter=0
-	for index in $(ls)
+	for index in $(ls -d */)
 	do
 		let counter+=1
 		if [ $counter == $number ]
@@ -215,6 +276,10 @@ esac
 
 cd repo
 
+pass=false
+while [ "$pass" = false ]
+do
+
 cat << DOCUMENT
 
         Menu
@@ -229,22 +294,26 @@ read option
 
 case $option in
 
-1) addRepo ;;
+1) addRepo; pass=true ;;
 
-2) delRepo ;;
+2) delRepo; pass=true ;;
 
-3) selRepo ;;
+3) selRepo; pass=true ;;
 
 0)  
 echo 
 echo "Thanks for your time!"
+pass=true
 ;; 
 
 *) 
 echo
-echo "Not an acceptable option."
+echo "Not an acceptable option. Try again:"
+pass=false
 ;;
 esac
+
+done
 
 cd ..
 exit 0
