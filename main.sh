@@ -108,11 +108,15 @@ check_out () {
 
 
 				#optionally open the file in sublime text if it is installed
-				if askYN "Would you like to open this file in an external editor (subl if installed)?"
+				if askYN "Would you like to open this file in an external editor (emacs if installed)?"
 				then
-					if ! subl $file; then #subl failed - possibly not installed
-						echo "Sublime Text is not installed. You can install it using \"sudo apt install subl\""
-						echo "Launching Nano editor to edit this file. Press the return key to continue."
+					if ! emacs $file; then #if emacs fails - possibly not installed
+						#originally we would try to open this in sublime so this check made more sense
+						# but that launched it in parallel or something 
+						# and for some reason made the file at &3 too busy to remove
+						#it doesn't make as much sense anymore because emacs is likely to be installed by default
+						echo "Emas is not installed. You can install it using \"sudo apt install emacs\""
+						echo "Attempting to launch nano editor to edit this file. Press the return key to continue."
 						read -n 1 -sr #-s hides input, -r skips escape chars, -n 1 stops reading after 1 char 
 						nano $file
 					fi
@@ -200,6 +204,7 @@ check_in () {
 				seconds="$(date +%s)"
 				diff "$outdir/$file" "$curr_repo/$file" > "$diffdir/$file-$seconds.diff" #save a diff file
 				cp "$outdir/$file" "$curr_repo/$file" # copy the file from the work directory to the current dirrectory
+				rm "$outdir/$file" #remove the file from the work directory
 
 				if askYN "Would you like to add a short comment about this edit to the log file?"
 				then
