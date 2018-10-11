@@ -1,8 +1,13 @@
 #!/bin/bash
 
-editor="subl" #default file editor
-diffdir=".diffs"
-logdir=".logs"
+declare -r editor="subl" #default file editor
+declare -r diffdir=".diffs"
+declare -r logdir=".logs"
+declare -r statusfile=".statusinfo"
+declare -r curr_repo="." #eh probably change this
+declare -r outdir="out"
+
+
 
 askYN () {
 	#expecting a question as $1 - e.g. "Do thing?", without the [Y/n]
@@ -20,6 +25,8 @@ askYN () {
  	done
 }
 
+
+
 function addRepo() 
 {
 	echo
@@ -29,6 +36,8 @@ function addRepo()
 	mkdir "$name/$diffdir"
 	mkdir "$name/$logdir"
 }
+
+
 
 function delRepo() 
 {
@@ -54,6 +63,8 @@ function delRepo()
 		fi
 	done
 }
+
+
 
 function archRepo()
 {
@@ -87,9 +98,7 @@ function archRepo()
 	done
 }
 
-statusfile=".statusinfo"
-curr_repo="." #eh probably change this
-outdir="out"
+
 
 make_statusfile() {
 
@@ -103,6 +112,7 @@ make_statusfile() {
 		done
 	fi
 }
+
 
 
 #logging a file out
@@ -174,6 +184,8 @@ check_out () {
 #cat "$statusfile"
 }
 
+
+
 add_to_repo () {
 	# expecting a name of the new file that should be added to the repository as parameter $1
 
@@ -206,6 +218,7 @@ add_to_repo () {
 		echo "This is not a valid path to a file"
 	fi
 }
+
 
 
 check_in () {
@@ -272,6 +285,8 @@ check_in () {
 
 }
 
+
+
 function selRepo() 
 {
 	echo
@@ -295,6 +310,8 @@ function selRepo()
 		fi 
 	done
 }
+
+
 
 function fileMenu() 
 {
@@ -323,21 +340,23 @@ read option
 
 case $option in
 
-1) check_out ;;
+1) 	check_out 
+;;
 
-2) check_in ;;
+2) 	check_in 
+;;
 
-3) add_to_repo ;;
+3) 	add_to_repo 
+;;
 
-0)  
-echo 
-echo "Thanks for your time!"
+0)  echo 
+	echo "Thanks for your time!"
 ;; 
 
-*) 
-echo
-echo "Not an acceptable option."
+*) 	echo
+	echo "Not an acceptable option."
 ;;
+
 esac
 }
 
@@ -366,23 +385,25 @@ read option
 
 case $option in
 
-1) addRepo ;;
+1) 	addRepo 
+;;
 
-2) delRepo ;;
+2) 	delRepo 
+;;
 
-3) selRepo ;;
+3) 	selRepo 
+;;
 
-4) archRepo ;;
+4) 	archRepo 
+;;
 
-0)  
-echo 
-echo "Thanks for your time!"
-exit=true
+0)  echo 
+	echo "Thanks for your time!"
+	exit=true
 ;; 
 
-*) 
-echo
-echo "Not an acceptable option. Try again:"
+*) 	echo
+	echo "Not an acceptable option. Try again:"
 ;;
 esac
 
