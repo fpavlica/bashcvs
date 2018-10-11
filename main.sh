@@ -21,15 +21,6 @@ askYN () {
  	done
 }
 
-# testing stuff:
-
-if askYN "Do you like bread?"
-then
-	echo "You like bread"
-else
-	echo "You don't like bread"
-fi
-
 function addRepo() 
 {
 	echo
