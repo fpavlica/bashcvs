@@ -21,15 +21,6 @@ askYN () {
  	done
 }
 
-# testing stuff:
-
-if askYN "Do you like bread?"
-then
-	echo "You like bread"
-else
-	echo "You don't like bread"
-fi
-
 function addRepo() 
 {
 	echo
@@ -267,6 +258,33 @@ function selRepo()
 	done
 }
 
+function archRepo()
+{
+	echo
+	echo "Which repository do you want to Archive?"
+	counter=0
+	for index in $(ls -d */)
+	do
+		let counter+=1
+		echo "$counter) $index"
+	done
+	read number
+	counter=0
+	for index in $(ls -d */)
+	do
+		let counter+=1
+		if [ $counter == $number ]
+		then
+			echo "What do you want to call the Archive Export zip?"
+			read filename
+			echo "You can find the new Archive in the Archive folder"
+			zip -r ${filename}.zip $index
+			
+			mv ../${filename}.zip /Archives
+		fi 
+	done
+}
+
 function fileMenu() 
 {
 	echo
@@ -300,6 +318,7 @@ case $option in
 
 3) add_to_repo ;;
 
+4) archRepo; pass=true;;
 0)  
 echo 
 echo "Thanks for your time!"
@@ -328,6 +347,7 @@ cat << DOCUMENT
 1) Create Repository
 2) Delete Repository
 3) Access Repository
+4) Archive Repository
 0) Quit
 DOCUMENT
 
@@ -340,6 +360,8 @@ case $option in
 2) delRepo ;;
 
 3) selRepo ;;
+
+4) archRepo ;;
 
 0)  
 echo 
