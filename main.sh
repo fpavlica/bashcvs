@@ -55,6 +55,38 @@ function delRepo()
 	done
 }
 
+function archRepo()
+{
+	echo
+	echo "Which repository do you want to Archive?"
+	counter=0
+	for index in $(ls -d */)
+	do
+		let counter+=1
+		echo "$counter) $index"
+	done
+	read number
+	counter=0
+	for index in $(ls -d */)
+	do
+		let counter+=1
+		if [ $counter == $number ]
+		then
+			echo "Enter a name for the Archive Export zip:"
+			read filename
+			echo "Enter the full path of the directory to export to:"
+			read filepath
+			if [ -d "$filepath" ]
+			then
+				echo "Archiving..."
+				zip -r "$filename.zip" "$index" -x "/.*" > /dev/null ;	mv "./$filename.zip" "$filepath"  &
+			else
+				echo "Directory does not exist"
+			fi
+		fi 
+	done
+}
+
 statusfile=".statusinfo"
 curr_repo="." #eh probably change this
 outdir="out"
@@ -311,7 +343,8 @@ esac
 
 
 
-
+mkdir arch 2> /dev/null
+mkdir repo 2> /dev/null
 cd repo
 
 exit=false
@@ -325,6 +358,7 @@ cat << DOCUMENT
 1) Create Repository
 2) Delete Repository
 3) Access Repository
+4) Archive Reposiory
 0) Quit
 DOCUMENT
 
@@ -337,6 +371,8 @@ case $option in
 2) delRepo ;;
 
 3) selRepo ;;
+
+4) archRepo ;;
 
 0)  
 echo 
