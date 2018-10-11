@@ -1,13 +1,12 @@
 #!/bin/bash
 
+
 declare -r editor="subl" #default file editor
 declare -r diffdir=".diffs"
 declare -r logdir=".logs"
 declare -r statusfile=".statusinfo"
 declare -r curr_repo="." #eh probably change this
 declare -r outdir="out"
-
-
 
 askYN () {
 	#expecting a question as $1 - e.g. "Do thing?", without the [Y/n]
@@ -25,8 +24,6 @@ askYN () {
  	done
 }
 
-
-
 function addRepo() 
 {
 	echo
@@ -35,9 +32,8 @@ function addRepo()
 	mkdir $name 
 	mkdir "$name/$diffdir"
 	mkdir "$name/$logdir"
+	mkdir "$name/$outdir"
 }
-
-
 
 function delRepo() 
 {
@@ -63,7 +59,6 @@ function delRepo()
 		fi
 	done
 }
-
 
 
 function archRepo()
@@ -99,7 +94,6 @@ function archRepo()
 }
 
 
-
 make_statusfile() {
 
 	if [ ! -f "$statusfile" ]
@@ -112,7 +106,6 @@ make_statusfile() {
 		done
 	fi
 }
-
 
 
 #logging a file out
@@ -150,21 +143,21 @@ check_out () {
 
 
 				#optionally open the file in sublime text if it is installed
-				if askYN "Would you like to open this file in an external editor (emacs if installed)?"
+				if askYN "Would you like to open this file in Nano?"
 				then
-					if ! emacs $file; then #if emacs fails - possibly not installed
+					# if ! vi $file; then #if vi fails - possibly not installed
 						#originally we would try to open this in sublime so this check made more sense
 						# but that launched it in parallel or something 
 						# and for some reason made the file at &3 too busy to remove
-						#it doesn't make as much sense anymore because emacs is likely to be installed by default
-						echo "Emas is not installed. You can install it using \"sudo apt install emacs\""
-						echo "Attempting to launch nano editor to edit this file. Press the return key to continue."
-						read -n 1 -sr #-s hides input, -r skips escape chars, -n 1 stops reading after 1 char 
-						nano $file
-					fi
-				else
-					echo "You can edit this file later by opening $(pwd)/$outdir/$file in your favourite text editor."
+						#it doesn't make as much sense anymore because vim is likely to be installed by default
+					#	echo "Vim is not installed. You can install it using \"sudo apt install vim\""
+					#	echo "Attempting to launch nano editor to edit this file. Press the return key to continue."
+					#	read -n 1 -sr #-s hides input, -r skips escape chars, -n 1 stops reading after 1 char 
+						nano "$outdir/$file"
+					#fi
 				fi
+					echo "You can edit this file later by opening $(pwd)/$outdir/$file in your favourite text editor."
+				#fi
 
 			elif [ "$line" = "$file,OUT" ]
 			then
@@ -183,8 +176,6 @@ check_out () {
 	fi
 #cat "$statusfile"
 }
-
-
 
 add_to_repo () {
 	# expecting a name of the new file that should be added to the repository as parameter $1
@@ -220,15 +211,10 @@ add_to_repo () {
 }
 
 
-
 check_in () {
+	mkdir "$logdir" 2>/dev/null #make the directory if it deosn't exist yet and discard the error message if it does
 	echo "enter the name of the file you want to log in / update"
-	read file  #$file is the path of the file to be checked in, passed as the first variable to the function
-		#TODO make sure newpath exists
-
-	#     ask to enter full path of the newly edited file
-	#echo "please enter the FULL path to the new file"
-	#read fullpath
+	read file 
 
 	#if file exists
 	if [ -f $file ]
@@ -247,7 +233,8 @@ check_in () {
 			if [ "$line" = "$file,OUT" ]
 			then
 				seconds="$(date +%s)"
-				diff "$outdir/$file" "$curr_repo/$file" > "$diffdir/$file-$seconds.diff" #save a diff file
+				diffpath="$diffdir/$file-$seconds.diff"
+				diff "$outdir/$file" "$curr_repo/$file" > "$diffpath" #save a diff file
 				cp "$outdir/$file" "$curr_repo/$file" # copy the file from the work directory to the current dirrectory
 				rm "$outdir/$file" #remove the file from the work directory
 
@@ -256,7 +243,14 @@ check_in () {
 					echo "Enter your comment:"
 					read comment
 				fi
-			 	echo "$(date -d@$seconds): $comment" >> "$logdir/$file.log"
+			 	echo "$(date -d@$seconds): $comment" >> "$logdir/$file.rlog" #rlog stands for readable log
+			 	if [ ! -f "$logdir/$file.dlog" ] ; then
+			 		touch "$logdir/$file.dlog"
+			 	fi
+
+			 	#adding the name of the diff file to the top of a log file
+			 	echo "$diffpath
+$(cat "$logdir/$file.dlog")" > "$logdir/$file.dlog" #dlog stands for diff log
 
 				line="$file,IN" # change the line to $file,IN
 				echo "File checked in successfully."
@@ -285,7 +279,34 @@ check_in () {
 
 }
 
+roll_back () {
+	echo "enter the name of the file you want to roll back to the previous version"
+	read file 
 
+	#if file exists
+	if [ -f "$file" ] && [ -f "$logdir/$file.dlog" ] 
+	then 
+		read diffname < "$logdir/$file.dlog"
+		patch "$file" "$diffname"
+		sed -i -e '1,1d' "$logdir/$file.dlog"
+	else 
+	 	echo "\"$file\" is not a correct file path or there's nothing to roll back to."
+	fi
+}
+
+display_file () {
+
+	echo "enter the name of the file you want to display"
+	read file 
+
+	#if file exists
+	if [ -f "$file" ]
+	then 
+		less "$file"
+	else 
+	 	echo "\"$file\" is not a correct file path."
+	fi
+}
 
 function selRepo() 
 {
@@ -311,10 +332,11 @@ function selRepo()
 	done
 }
 
-
-
 function fileMenu() 
 {
+	exit=false
+	while [ ! $exit = "true" ]
+	do
 	echo
 	if [ "$(ls -1|wc -l)" == 0 ]
 	then
@@ -333,6 +355,7 @@ cat << FILE_MENU
 2) Log in file
 3) Add a file
 4) Roll back a file to the previous version
+5) Display the contents of a file
 0) Quit
 FILE_MENU
 
@@ -340,24 +363,28 @@ read option
 
 case $option in
 
-1) 	check_out 
-;;
+1) check_out ;;
 
-2) 	check_in 
-;;
+2) check_in ;;
 
-3) 	add_to_repo 
-;;
+3) add_to_repo ;;
 
-0)  echo 
-	echo "Thanks for your time!"
+4) roll_back ;;
+
+5) display_file ;;
+
+0)  
+exit=true
+echo 
+echo "Thanks for your time!"
 ;; 
 
-*) 	echo
-	echo "Not an acceptable option."
+*) 
+echo
+echo "Not an acceptable option."
 ;;
-
 esac
+done
 }
 
 
@@ -385,28 +412,25 @@ read option
 
 case $option in
 
-1) 	addRepo 
-;;
+1) addRepo ;;
 
-2) 	delRepo 
-;;
+2) delRepo ;;
 
-3) 	selRepo 
-;;
+3) selRepo ;;
 
-4) 	archRepo 
-;;
+4) archRepo ;;
 
-0)  echo 
-	echo "Thanks for your time!"
-	exit=true
+0)  
+echo 
+echo "Thanks for your time!"
+exit=true
 ;; 
 
-*) 	echo
-	echo "Not an acceptable option. Try again:"
+*) 
+echo
+echo "Not an acceptable option. Try again:"
 ;;
 esac
-
 done
 
 cd ..
