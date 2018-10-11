@@ -6,24 +6,16 @@ logdir=".logs"
 
 askYN () {
 	#expecting a question as $1 - e.g. "Do thing?", without the [Y/n]
-
-	pass=false
-	choice=N
-
-	while [ "$pass" = false ] 
+ 	while [ 0 ] # not very clean code but this is bash after all
  	do
 		echo "$1 [Y/n]"
-	 	read choice #</dev/tty 
+	 	read choice #</dev/tty # to force read from command line
  		case $choice in
- 			Y|y) 
-				pass=true
+ 			Y|y)
 				return 0 ;; #true
 			N|n) 
-				pass=true
 				return 1 ;; #false
-			*) 
-				pass=false
-				echo "Invalid option. Try again:" ;;
+			*) echo "Invalid option. Try again:" ;;
  		esac
  	done
 }
