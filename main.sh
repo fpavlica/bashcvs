@@ -4,6 +4,32 @@ editor="subl" #default file editor
 diffdir=".diffs"
 logdir=".logs"
 
+askYN () {
+	#expecting a question as $1 - e.g. "Do thing?", without the [Y/n]
+
+ 	while [ 0 ] # not very clean code but this is bash after all
+ 	do
+		echo "$1 [Y/n]"
+	 	read choice
+ 		case $choice in
+ 			Y|y)
+				return 0 ;; #true
+			N|n) 
+				return 1 ;; #false
+			*) echo "Invalid option. Try again:" ;;
+ 		esac
+ 	done
+}
+
+# testing stuff:
+
+if askYN "Do you like bread?"
+then
+	echo "You like bread"
+else
+	echo "You don't like bread"
+fi
+
 function addRepo() 
 {
 	echo
@@ -32,22 +58,9 @@ function delRepo()
 		let counter+=1
 		if [ $counter == $number ]
 		then
-			pass=false
-		 	while [ "$pass" = false ]
-		 	do
-
-			 	echo "Are you sure that you want to delete the repository $index and all files in it? (Y/n)"
-			 	read choice
-		 		case $choice in
-		 			Y|y) # TODO add file to repo, ask for source
-						rm -r $index
-						pass=true ;;
-					N|n) echo "not removing"
-						pass=true	;;
-					*) echo "Invalid option. Try again:"
-						pass=false ;;
-		 		esac
-		 	done
+			if askYN "Are you sure that you want to delete the repository $index and all files in it?"; then
+				rm -r $index 
+			fi
 		fi
 	done
 }
@@ -69,6 +82,7 @@ make_statusfile() {
 	fi
 }
 
+
 #logging a file out
 check_out () {
 	pwd
@@ -85,7 +99,6 @@ check_out () {
 		# copy it to the new path
 		# cp "$file" "$newpath"
 
-		cp "$file" "$outdir" #copy the file to the editing directory
 
 		#make a temp new statusfile
 		touch tempstatusfile
@@ -99,6 +112,21 @@ check_out () {
 			then
 				#change the line to $file,OUT
 				line="$file,OUT"
+				cp "$file" "$outdir" #copy the file to the editing directory
+
+
+				#optionally open the file in sublime text if it is installed
+				if askYN "Would you like to open this file in an external editor (subl if installed)?"
+				then
+					if ! subl $file; then #subl failed - possibly not installed
+						echo "Sublime Text is not installed. You can install it using \"sudo apt install subl\""
+						echo "Launching Nano editor to edit this file. Press the return key to continue."
+						read -n 1 -sr #-s hides input, -r skips escape chars, -n 1 stops reading after 1 char 
+						nano $file
+					fi
+				else
+					echo "You can edit this file later by opening $(pwd)/$outdir/$file in your favourite text editor."
+				fi
 
 			elif [ "$line" = "$file,OUT" ]
 			then
@@ -121,14 +149,31 @@ check_out () {
 add_to_repo () {
 	# expecting a name of the new file that should be added to the repository as parameter $1
 
+	ls -1 #display contents so the user can make sure they're in the right repository and are trying to add the right files
 	#ask for source
 	echo "Please enter the full path of the file you would like to add"
 	read fToAdd
+	if [ -z $1 ] # if $1 is empty
+	then 
+		newName="$(basename fToAdd)" #don't change the name of the file when copying
+	else
+		newName="$1"
+	fi
+
 	if [ -f "$fToAdd" ]
 	then
-		cp "$fToAdd" "$curr_repo" # copy the file to the current folder
-		echo "$1,IN" >> $statusfile
-		echo "Added $fToAdd to the current repository as $1"
+		if [ -f "$curr_repo/$newName" ] # if this file is already in the repository
+		then
+			if askYN "This file is already in the repository. Do you want to overwrite it?"
+			then
+				echo "Overwriting $newName..." # continue on
+			else
+				return 1 # leave the function
+			fi
+		fi
+		cp "$fToAdd" "$curr_repo/$newName" # copy the file to the current folder
+		echo "$newName,IN" >> $statusfile
+		echo "Added $fToAdd to the current repository as $newName"
 	else
 		echo "This is not a valid path to a file"
 	fi
@@ -164,23 +209,11 @@ check_in () {
 				diff "$outdir/$file" "$curr_repo/$file" > "$diffdir/$file-$seconds.diff" #save a diff file
 				cp "$outdir/$file" "$curr_repo/$file" # copy the file from the work directory to the current dirrectory
 
-
-			 	pass=false
-			 	while [ "$pass" = false ]
-			 	do
-					echo "Would you like to add a short comment about this edit to the log file? (Y/n)"
-				 	read choice
-			 		case $choice in
-			 			Y|y)
-							echo "Enter your comment:"
-							read comment
-							pass=true ;;
-						N|n) 
-							pass=true	;;
-						*) echo "Invalid option. Try again:"
-							pass=false ;;
-			 		esac
-			 	done
+				if askYN "Would you like to add a short comment about this edit to the log file?"
+				then
+					echo "Enter your comment:"
+					read comment
+				fi
 			 	echo "$(date -d@$seconds): $comment" >> "$logdir/$file.log"
 
 				line="$file,IN" # change the line to $file,IN
@@ -199,22 +232,12 @@ check_in () {
 		exec 3>&-
 		rm tempstatusfile
 	else 
-	 	pass=false
-	 	while [ "$pass" = false ]
-	 	do
-
-		 	echo "\"$file\" is not in the repository. Would you like to add it? (Y/n)"
-		 	read choice
-	 		case $choice in
-	 			Y|y) # TODO add file to repo, ask for source
-					add_to_repo $file
-					pass=true ;;
-				N|n) echo "not adding"
-					pass=true	;;
-				*) echo "Invalid option. Try again:"
-					pass=false ;;
-	 		esac
-	 	done
+		if askYN "\"$file\" is not in the repository. Would you like to add it?"
+		then
+			add_to_repo $file
+		else
+			echo "not adding"
+		fi
 	fi
 	#cat "$statusfile"
 
@@ -262,6 +285,8 @@ cat << FILE_MENU
 --------------------
 1) Log out file
 2) Log in file
+3) Add a file
+4) Roll back a file to the previous version
 0) Quit
 FILE_MENU
 
@@ -272,6 +297,8 @@ case $option in
 1) check_out ;;
 
 2) check_in ;;
+
+3) add_to_repo ;;
 
 0)  
 echo 
@@ -290,8 +317,8 @@ esac
 
 cd repo
 
-pass=false
-while [ "$pass" = false ]
+exit=false
+until [ "$exit" = true ]
 do
 
 cat << DOCUMENT
@@ -308,22 +335,21 @@ read option
 
 case $option in
 
-1) addRepo; pass=true ;;
+1) addRepo ;;
 
-2) delRepo; pass=true ;;
+2) delRepo ;;
 
-3) selRepo; pass=true ;;
+3) selRepo ;;
 
 0)  
 echo 
 echo "Thanks for your time!"
-pass=true
+exit=true
 ;; 
 
 *) 
 echo
 echo "Not an acceptable option. Try again:"
-pass=false
 ;;
 esac
 
