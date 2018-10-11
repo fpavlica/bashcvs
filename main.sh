@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 editor="subl" #default file editor
 diffdir=".diffs"
@@ -7,16 +7,23 @@ logdir=".logs"
 askYN () {
 	#expecting a question as $1 - e.g. "Do thing?", without the [Y/n]
 
- 	while [ 0 ] # not very clean code but this is bash after all
+	pass=false
+	choice=N
+
+	while [ "$pass" = false ] 
  	do
 		echo "$1 [Y/n]"
-	 	read choice
+	 	read choice #</dev/tty 
  		case $choice in
- 			Y|y)
+ 			Y|y) 
+				pass=true
 				return 0 ;; #true
 			N|n) 
+				pass=true
 				return 1 ;; #false
-			*) echo "Invalid option. Try again:" ;;
+			*) 
+				pass=false
+				echo "Invalid option. Try again:" ;;
  		esac
  	done
 }
@@ -58,7 +65,7 @@ function delRepo()
 
 statusfile=".statusinfo"
 curr_repo="." #eh probably change this
-outdir="./out"
+outdir="out"
 
 make_statusfile() {
 
@@ -92,17 +99,19 @@ check_out () {
 
 
 		#make a temp new statusfile
-		touch tempstatusfile
-		exec 3<> ./tempstatusfile
+		tempstatusfile=".tempstatusfile"
+		touch "$tempstatusfile"
+		exec 3<> "./$tempstatusfile"
 
 
-		while read line || [ -n "$line" ]	#should prevent skipping the last line
+		while read -u 4 line || [ -n "$line" ]	#should prevent skipping the last line # -u 4 makes it read from FD 4
 		do
 			#echo "$line"
 			if [ "$line" = "$file,IN" ]
 			then
 				#change the line to $file,OUT
 				line="$file,OUT"
+				mkdir "$outdir" 2>/dev/null # makes the directory and if it exists already hide the error message
 				cp "$file" "$outdir" #copy the file to the editing directory
 
 
@@ -127,10 +136,10 @@ check_out () {
 				#echo "sdfkjsdfjs"
 			fi
 			echo "$line" >&3
-		done < "$statusfile"
-		cat tempstatusfile > "$statusfile"
+		done 4< "$statusfile"
+		cat "$tempstatusfile" > "$statusfile"
 		exec 3>&-
-		rm tempstatusfile
+		rm "$tempstatusfile" # doesn't remove the file because subl just messes ev erything up
 	else 
 	 	echo "\"$file\" is not a correct file path."
 	fi
@@ -146,7 +155,7 @@ add_to_repo () {
 	read fToAdd
 	if [ -z $1 ] # if $1 is empty
 	then 
-		newName="$(basename fToAdd)" #don't change the name of the file when copying
+		newName="$(basename $fToAdd)" #don't change the name of the file when copying
 	else
 		newName="$1"
 	fi
@@ -191,7 +200,7 @@ check_in () {
 
 
 		#sed -ie "s/$file,E/$file,F/" $statusfile #logs that the file is being edited in $statusfile
-		while read line || [ -n "$line" ]	#should prevent skipping the last line
+		while read -u 4 line || [ -n "$line" ]	#should prevent skipping the last line
 		do
 			#echo "$line"
 			if [ "$line" = "$file,OUT" ]
@@ -218,7 +227,7 @@ check_in () {
 				#echo "sdfkjsdfjs"
 			fi
 			echo "$line" >&3
-		done < "$statusfile"
+		done 4< "$statusfile"
 		cat tempstatusfile > "$statusfile"
 		exec 3>&-
 		rm tempstatusfile
@@ -309,7 +318,7 @@ esac
 cd repo
 
 exit=false
-until [ "$exit" = true ]
+while [ ! "$exit" = true ]
 do
 
 cat << DOCUMENT
