@@ -15,7 +15,7 @@ declare -r diffdir=".diffs"				# This is the diffrent directory
 declare -r logdir=".logs"				# This is the log directory
 declare -r statusfile=".statusinfo"		# This is the status file
 declare -r curr_repo="." 				# This is the current repo
-declare -r outdir="out"					# This is the output directory
+declare -r outdir=".out"					# This is the output directory
 
 # Function Purpose : Add/create a new repo
 # Parameters : None
@@ -35,6 +35,7 @@ function addRepo()
 	mkdir "$name/$diffdir"
 	mkdir "$name/$logdir"
 	mkdir "$name/$outdir"
+	echo "The repository $name has been created."
 }
 
 # Function Purpose : Delete/remove a repo
@@ -42,14 +43,21 @@ function addRepo()
 
 function delRepo() 
 {
+	#make sure a repository has been created
+	if [ -z "$(ls -d */ 2>/dev/null)" ] #if current directory is empty
+	then
+		echo "No repositories to delete"
+		return 2;
+	fi
+
 	echo 
 
-	# Ask user to select repository to dekete
+	# Ask user to select repository to delete
 	echo "Which repository do you want to delete?"
 
 	# This loop displays all repos to the user
 	counter=0
-	for index in $(ls)
+	for index in $(ls -d */ 2>/dev/null)
 	do
 		let counter+=1
 		echo "$counter) $index"
@@ -61,13 +69,17 @@ function delRepo()
 
 	# Now lets check that they actually wanted to delete that repo
 	counter=0
-	for index in $(ls)
+	for index in $(ls -d */ 2>/dev/null)
 	do
 		let counter+=1
 		if [ $counter == $number ]
 		then
 			if askYN "Are you sure that you want to delete the repository $index and all files in it?"; then
-				rm -r $index 
+				if rm -r $index ;then
+					echo "Removed successfully"
+				else 
+					echo "Removal failed"
+				fi
 			fi
 		fi
 	done
@@ -78,6 +90,13 @@ function delRepo()
 
 function archRepo()
 {
+	#Make sure a repository has been created
+	if [ -z "$(ls -d */ 2>/dev/null)" ] #if current directory is empty
+	then
+		echo "No repositories have been created yet"
+		return 2;
+	fi
+
 	echo
 
 	# Ask the user to select a repo to archive
@@ -85,7 +104,7 @@ function archRepo()
 
 	# This loop displays all repos to the user
 	counter=0
-	for index in $(ls -d */)
+	for index in $(ls -d */ 2>/dev/null)
 	do
 		let counter+=1
 		echo "$counter) $index"
@@ -96,15 +115,13 @@ function archRepo()
 
 	# This loop gets the user to name the export zip they want to archive
 	counter=0
-	for index in $(ls -d */)
+	for index in $(ls ) #-d */ 2>/dev/null)
 	do
 		let counter+=1
 		if [ $counter == $number ]
 		then
 
-			# Enter name
-			echo "Enter a name for the Archive Export zip:"
-			read filename
+			filename=$index
 
 			# Enter path
 			echo "Enter the full path of the directory to export to:"
@@ -114,25 +131,25 @@ function archRepo()
 			if [ -d "$filepath" ]
 			then
 				echo "Archiving..."
-				zip -r "$filename.zip" "$index" -x "/.*" > /dev/null ;	mv "./$filename.zip" "$filepath"  &
 			else
-				echo "Directory does not exist"
+				echo "Directory does not exist. Archiving to the folder where this program is located."
+				filepath=".."
 			fi
+				zip -r "$filename.zip" "$index" -x "*/.*" > /dev/null ;	mv "./$filename.zip" "$filepath"; echo "Archiving done"  &
 		fi 
 	done
 }
 
 # Function Purpose : Asks the user yes or no
-# Parameters : None
+# Parameters : The yes/no question to ask
 
 askYN () {
 
 	# Get user input
- 	while [ 0 ]
+ 	while [ 0 ] # oof
  	do
 		echo "$1 [Y/n]"
 
-		#</dev/tty # to force read from command line
 	 	read choice
  		case $choice in
  			Y|y)
@@ -151,14 +168,14 @@ askYN () {
 
 make_statusfile() {
 
-	#Archie comment me
+	#make a out/in status file if it is not made yet
 	if [ ! -f "$statusfile" ]
 	then
 		touch "$statusfile"
 		for file in $(ls)
 		do
 			echo "$file,IN" >> "$statusfile"
-			# $file,OUT means the file is being rdited, $file,IN means it's finished until further changes are needed
+			# $file,OUT means the file is being edited, $file,IN means it's finished until further changes are needed
 		done
 	fi
 }
@@ -167,9 +184,6 @@ make_statusfile() {
 # Parameters : None
 
 check_out () {
-	
-	# Get present working directory
-	pwd
 	
 	# Ask user for the name of the file they want to log out
 	echo "enter name of the file to log out"
@@ -238,13 +252,26 @@ check_out () {
 #cat "$statusfile"
 }
 
-# Function Purpose : Add file to repo
+
+# Function Purpose : Create a new file in the repository
 # Parameters : None
+create_file () {
+	echo "Please enter the name of the file you would like to create:"
+	read name
+	touch "$name"
+	
+	echo "$name,IN" >> $statusfile
+	echo "Added $name to the current repository."
+}
 
-add_to_repo () {
-	# expecting a name of the new file that should be added to the repository as parameter $1
 
-	ls -1 #display contents so the user can make sure they're in the right repository and are trying to add the right files
+# Function Purpose : Add an external file to the repository
+# Parameters : optionally a new name for the file
+add_file () {
+
+	# expecting a name of the new file that should be added to the repository as parameter $1, if the name should be changed
+
+	ls -1 # display contents so the user can make sure they're in the right repository and are trying to add the right files
 	#ask for source
 	echo "Please enter the full path of the file you would like to add"
 	read fToAdd
@@ -272,6 +299,45 @@ add_to_repo () {
 	else
 		echo "This is not a valid path to a file"
 	fi
+}
+
+# Function Purpose : Show options for adding a file to the repository
+# Parameters : None
+
+add_to_repo () {
+	exit=false
+	while [ ! "$exit" = true ]
+	do
+	cat << DOCUMENT
+
+        Options
+--------------------
+1) Add an existing file to the repository
+2) Create a new file in the repository
+0) Cancel
+DOCUMENT
+
+	# Read the user input
+	read option
+
+	case $option in
+
+	1) add_file; exit=true ;;
+
+	2) create_file; exit=true ;;
+
+	# leave
+	0) exit=true ;; 
+
+	# Invalid input
+	*) 
+	exit = false;
+	echo
+	echo "Not an acceptable option. Try again:"
+	;;
+	esac
+	done
+	exit=false
 }
 
 # Function Purpose : Check in a file to repo
@@ -358,8 +424,44 @@ roll_back () {
 		read diffname < "$logdir/$file.dlog"
 		patch "$file" "$diffname"
 		sed -i -e '1,1d' "$logdir/$file.dlog"
+		seconds="$(date +%s)"
+	 	echo "$(date -d@$seconds): Rolled back" >> "$logdir/$file.rlog"
 	else 
 	 	echo "\"$file\" is not a correct file path or there's nothing to roll back to."
+	fi
+}
+
+# Function Purpose : Edit a file that has been logged out
+# Parameters : None
+
+edit_file () {
+
+	echo "enter the name of the logged out file you want to edit"
+	read file 
+	filelocation="$outdir/$file"
+
+	#if file exists
+	if [ -f $file ]
+	then 
+
+		while read -u 4 line || [ -n "$line" ]	#should prevent skipping the last line
+		do
+			#echo "$line"
+			if [ "$line" = "$file,OUT" ]
+			then
+				nano "$filelocation"
+			elif [ "$line" = "$file,IN" ]
+			then
+				echo "This file has not been checked out yet."
+			fi
+		done 4< "$statusfile"
+	else 
+		if askYN "\"$file\" is not in the repository. Would you like to add it?"
+		then
+			add_to_repo "$file"
+		else
+			echo "not adding"
+		fi
 	fi
 }
 
@@ -375,7 +477,36 @@ display_file () {
 	#if file exists
 	if [ -f "$file" ]
 	then 
-		less "$file"
+		if [ -f "$outdir/$file" ]
+		then
+			less "$outdir/$file"
+		else
+			less "$file"
+		fi
+	else 
+	 	echo "\"$file\" is not a correct file path." # Error check
+	fi
+}
+
+
+# Function Purpose : Display a log file
+# Parameters : None
+
+display_log () {
+
+	# Ask user for name of file they want to display
+	echo "enter the name of the file whose log you want to display"
+	read file 
+
+	#if file exists
+	if [ -f "$file" ]
+	then 
+		if [ -f "$logdir/$file.rlog" ]
+		then
+			less "$logdir/$file.rlog"
+		else
+			echo "\"$file\" does not have a log entry. This might mean it heas not been edited yet"
+		fi
 	else 
 	 	echo "\"$file\" is not a correct file path." # Error check
 	fi
@@ -386,6 +517,13 @@ display_file () {
 
 function selRepo() 
 {
+	#Make sure a repository has been created
+	if [ -z "$(ls -d */ 2>/dev/null)" ] #if current directory is empty
+	then
+		echo "No repositories have been created yet"
+		return 2;
+	fi
+
 	# Ask the user what repo they would like to access
 	echo
 	echo "Which repository do you want to access?"
@@ -393,7 +531,7 @@ function selRepo()
 	counter=0
 
 	# Display list of options
-	for index in $(ls -d */)
+	for index in $(ls -d */  2>/dev/null)
 	do
 		let counter+=1
 		echo "$counter) $index"
@@ -404,7 +542,7 @@ function selRepo()
 
 	# Show file menu
 	counter=0
-	for index in $(ls -d */)
+	for index in $(ls -d */  2>/dev/null)
 	do
 		let counter+=1
 		if [ $counter == $number ]
@@ -416,71 +554,74 @@ function selRepo()
 	done
 }
 
-# Function Purpose : Show a menu regardubg file operations
+# Function Purpose : Show a menu regarding file operations
 # Parameters : None
 
 function fileMenu() 
 {
-	exit=false					# Archie you would do a better job commenting here
+	exit=false		
 	while [ ! $exit = "true" ]
 	do
 	echo
 	if [ "$(ls -1|wc -l)" == 0 ]
 	then
-		echo "No files to show" # If there are no files to show (Pro Comment)
+		echo "No files to show" # If there are no files to show
 	else
 		make_statusfile
 		echo "Files:"	
 		ls -1 --color=auto
 	fi
 
-cat << FILE_MENU
-	
+	cat << FILE_MENU
+		
      File Menu
 --------------------
-1) Log out file
-2) Log in file
-3) Add a file
-4) Roll back a file to the previous version
+1) Add a file
+2) Log out file
+3) Log in file
+4) Edit a file that has been logged out
 5) Display the contents of a file
-0) Quit
+6) Roll back a file to the previous version
+7) Display a file log with comments about edits
+0) Go back to the main menu
 FILE_MENU
 
-# Read in the user input
-read option
+	# Read in the user input
+	read option
 
-# Go put input down a case system
-case $option in
+	# Go put input down a case system
+	case $option in
 
-1) check_out ;;
+	1) add_to_repo ;;
 
-2) check_in ;;
+	2) check_out ;;
 
-3) add_to_repo ;;
+	3) check_in ;;
 
-4) roll_back ;;
+	4) edit_file ;;
 
-5) display_file ;;
+	5) display_file ;;
 
-# Exit script
-0)  
-exit=true
-echo 
-echo "Thanks for your time!"
-;; 
+	6) roll_back ;;
 
-# Invalid input
-*) 
-echo
-echo "Not an acceptable option."
-;;
-esac
-done
+	7) display_log ;;
+
+	# Exit script
+	0)  
+	exit=true
+	;; 
+
+	# Invalid input
+	*) 
+	echo
+	echo "Not an acceptable option."
+	;;
+	esac
+	done
+	exit=false
 }
 
-
-# Archie you should probs do this too
-mkdir arch 2> /dev/null
+#make a direcory for the repositories if it does not exist yet; if it does, discard the error message 
 mkdir repo 2> /dev/null
 cd repo
 
